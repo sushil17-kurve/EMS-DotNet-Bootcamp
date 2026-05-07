@@ -1,0 +1,21 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+appsettings.Development.json
+
+## Node / React
+node_modules/
+frontend/ems-client/build/
+.env
+.env.local
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log
+logs/
