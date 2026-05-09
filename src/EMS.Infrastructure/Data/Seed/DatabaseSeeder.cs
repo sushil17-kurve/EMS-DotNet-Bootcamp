@@ -1,5 +1,6 @@
 using EMS.Domain.Entities;
 using EMS.Domain.Enums;
+using EMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace EMS.Infrastructure.Data.Seed;

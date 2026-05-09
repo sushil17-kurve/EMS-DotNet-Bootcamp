@@ -1,0 +1,17 @@
+using EMS.Application.Interfaces.Repositories;
+
+namespace EMS.Application.Interfaces;
+
+public interface IUnitOfWork : IDisposable
+{
+    IUserRepository Users { get; }
+    IEmployeeRepository Employees { get; }
+    IDepartmentRepository Departments { get; }
+    ILeaveRequestRepository LeaveRequests { get; }
+
+    Task<int> SaveChangesAsync();
+
+    Task BeginTransactionAsync();
+    Task CommitTransactionAsync();
+    Task RollbackTransactionAsync();
+}

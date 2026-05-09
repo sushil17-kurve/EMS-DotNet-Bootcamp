@@ -5,10 +5,15 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Services
+builder.Services.AddControllers();
+
+// Register Infrastructure (DbContext + UnitOfWork)
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
+// Auto migrate + seed
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -19,5 +24,9 @@ using (var scope = app.Services.CreateScope())
     Console.WriteLine("Seeding database...");
     await DatabaseSeeder.SeedAsync(db);
 }
+
+app.UseAuthorization();
+
+app.MapControllers();
 
 app.Run();
