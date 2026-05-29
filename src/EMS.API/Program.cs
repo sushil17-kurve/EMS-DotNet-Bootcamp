@@ -1,3 +1,4 @@
+using EMS.Application;
 using EMS.Infrastructure;
 using EMS.Infrastructure.Data;
 using EMS.Infrastructure.Data.Seed;
@@ -8,10 +9,22 @@ var builder = WebApplication.CreateBuilder(args);
 // Services
 builder.Services.AddControllers();
 
-// Register Infrastructure (DbContext + UnitOfWork)
+// Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Application + Infrastructure
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+// Swagger
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 // Auto migrate + seed
 using (var scope = app.Services.CreateScope())
