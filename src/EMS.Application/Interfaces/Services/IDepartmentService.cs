@@ -1,12 +1,13 @@
-﻿using EMS.Application.DTOs.Department;
+﻿using EMS.Application.DTOs.Common;
+using EMS.Application.DTOs.Department;
 
 namespace EMS.Application.Interfaces.Services;
 
 public interface IDepartmentService
 {
-    Task<IEnumerable<DepartmentDto>> GetAllAsync();
-    Task<DepartmentDto?> GetByIdAsync(int id);
-    Task<DepartmentDto> CreateAsync(CreateDepartmentDto dto);
-    Task<bool> UpdateAsync(int id, UpdateDepartmentDto dto);
-    Task<bool> DeleteAsync(int id);
+    Task<ApiResponseDto<IEnumerable<DepartmentDto>>> GetAllAsync();
+    Task<ApiResponseDto<DepartmentDto>> GetByIdAsync(int id);
+    Task<ApiResponseDto<DepartmentDto>> CreateAsync(CreateDepartmentDto dto);
+    Task<ApiResponseDto<DepartmentDto>> UpdateAsync(int id, UpdateDepartmentDto dto);
+    Task<ApiResponseDto<bool>> DeleteAsync(int id);
 }

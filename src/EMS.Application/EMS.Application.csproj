@@ -10,7 +10,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="DTOs\Auth\" />
     <Folder Include="DTOs\Employee\" />
     <Folder Include="DTOs\LeaveRequest\" />
   </ItemGroup>

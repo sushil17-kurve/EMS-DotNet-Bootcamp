@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using EMS.Application.DTOs.Common;
 using EMS.Application.DTOs.Department;
 using EMS.Application.Interfaces;
 using EMS.Application.Interfaces.Services;
@@ -8,81 +9,93 @@ namespace EMS.Application.Services;
 
 public class DepartmentService : IDepartmentService
 {
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUnitOfWork _uow;
     private readonly IMapper _mapper;
 
-    public DepartmentService(
-        IUnitOfWork unitOfWork,
-        IMapper mapper)
+    public DepartmentService(IUnitOfWork uow, IMapper mapper)
     {
-        _unitOfWork = unitOfWork;
+        _uow = uow;
         _mapper = mapper;
     }
 
-    public async Task<IEnumerable<DepartmentDto>> GetAllAsync()
+    public async Task<ApiResponseDto<IEnumerable<DepartmentDto>>> GetAllAsync()
     {
-        var departments =
-            await _unitOfWork.Departments.GetAllAsync();
-
-        return _mapper.Map<IEnumerable<DepartmentDto>>(departments);
+        var departments = await _uow.Departments.GetAllWithEmployeeCountAsync();
+        var dtos = _mapper.Map<IEnumerable<DepartmentDto>>(departments);
+        return ApiResponseDto<IEnumerable<DepartmentDto>>.Ok(dtos);
     }
 
-    public async Task<DepartmentDto?> GetByIdAsync(int id)
+    public async Task<ApiResponseDto<DepartmentDto>> GetByIdAsync(int id)
     {
-        var department =
-            await _unitOfWork.Departments.GetByIdAsync(id);
+        var department = await _uow.Departments.GetByIdWithEmployeesAsync(id);
+        if (department == null)
+            return ApiResponseDto<DepartmentDto>.Fail($"Department with ID {id} not found.");
 
-        return department == null
-            ? null
-            : _mapper.Map<DepartmentDto>(department);
+        return ApiResponseDto<DepartmentDto>.Ok(_mapper.Map<DepartmentDto>(department));
     }
 
-    public async Task<DepartmentDto> CreateAsync(CreateDepartmentDto dto)
+    public async Task<ApiResponseDto<DepartmentDto>> CreateAsync(CreateDepartmentDto dto)
     {
-        // Replace 'Departments' with the correct entity type, likely 'Department'.
-        // Assuming your entity is named 'Department' (singular), update the following line:
+        // Business rule: department name must be unique
+        var exists = await _uow.Departments.ExistsAsync(
+            d => d.Name.ToLower() == dto.Name.ToLower());
+
+        if (exists)
+            return ApiResponseDto<DepartmentDto>.Fail(
+                $"Department '{dto.Name}' already exists.");
 
         var department = _mapper.Map<Department>(dto);
+        await _uow.Departments.AddAsync(department);
+        await _uow.SaveChangesAsync();
 
-        // Add this using directive at the top of the file (replace or add as needed)
-        
-        await _unitOfWork.Departments.AddAsync(department);
-        await _unitOfWork.SaveChangesAsync();
-
-        return _mapper.Map<DepartmentDto>(department);
+        return ApiResponseDto<DepartmentDto>.Ok(
+            _mapper.Map<DepartmentDto>(department),
+            "Department created successfully.");
     }
 
-    public async Task<bool> UpdateAsync(
-        int id,
-        UpdateDepartmentDto dto)
+    public async Task<ApiResponseDto<DepartmentDto>> UpdateAsync(int id, UpdateDepartmentDto dto)
     {
-        var department =
-            await _unitOfWork.Departments.GetByIdAsync(id);
-
+        var department = await _uow.Departments.GetByIdAsync(id);
         if (department == null)
-            return false;
+            return ApiResponseDto<DepartmentDto>.Fail($"Department with ID {id} not found.");
 
-        _mapper.Map(dto, department);
+        // Check name uniqueness excluding current record
+        var nameExists = await _uow.Departments.ExistsAsync(
+            d => d.Name.ToLower() == dto.Name.ToLower() && d.Id != id);
 
-        _unitOfWork.Departments.Update(department);
+        if (nameExists)
+            return ApiResponseDto<DepartmentDto>.Fail(
+                $"Department name '{dto.Name}' is already taken.");
 
-        await _unitOfWork.SaveChangesAsync();
+        _mapper.Map(dto, department);  // Map DTO into existing entity
+        department.UpdatedAt = DateTime.UtcNow;
+        _uow.Departments.Update(department);
+        await _uow.SaveChangesAsync();
 
-        return true;
+        return ApiResponseDto<DepartmentDto>.Ok(
+            _mapper.Map<DepartmentDto>(department),
+            "Department updated successfully.");
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<ApiResponseDto<bool>> DeleteAsync(int id)
     {
-        var department =
-            await _unitOfWork.Departments.GetByIdAsync(id);
-
+        var department = await _uow.Departments.GetByIdAsync(id);
         if (department == null)
-            return false;
+            return ApiResponseDto<bool>.Fail($"Department with ID {id} not found.");
 
-        _unitOfWork.Departments.Remove(department);
+        // Business rule: can't delete a department with active employees
+        var hasEmployees = await _uow.Departments.HasEmployeesAsync(id);
+        if (hasEmployees)
+            return ApiResponseDto<bool>.Fail(
+                "Cannot delete department with active employees. " +
+                "Reassign or deactivate employees first.");
 
-        await _unitOfWork.SaveChangesAsync();
+        // Soft delete — never hard delete in production
+        department.IsActive = false;
+        department.UpdatedAt = DateTime.UtcNow;
+        _uow.Departments.Update(department);
+        await _uow.SaveChangesAsync();
 
-        return true;
+        return ApiResponseDto<bool>.Ok(true, "Department deleted successfully.");
     }
 }
