@@ -64,9 +64,13 @@ public static class DependencyInjection
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<ILeaveRequestRepository, LeaveRequestRepository>();
 
+       
+       
+
         // ── Services ──────────────────────────────────────────────────────────
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IFileService, FileService>();
 
         return services;
     }

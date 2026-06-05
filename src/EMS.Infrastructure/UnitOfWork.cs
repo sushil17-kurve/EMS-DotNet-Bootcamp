@@ -11,30 +11,31 @@ public class UnitOfWork : IUnitOfWork
     private readonly ApplicationDbContext _context;
     private IDbContextTransaction? _transaction;
 
-    // Lazy initialization — repositories created only when first accessed
-    private IUserRepository?         _users;
-    private IEmployeeRepository?     _employees;
-    private IDepartmentRepository?   _departments;
+    private IUserRepository? _users;
+    private IEmployeeRepository? _employees;
+    private IDepartmentRepository? _departments;
     private ILeaveRequestRepository? _leaveRequests;
+    private ILeaveTypeRepository? _leaveTypes;    // ← Add this
 
     public UnitOfWork(ApplicationDbContext context)
     {
         _context = context;
     }
 
-    // ??= means: "if null, create it; otherwise return existing"
-    // All repositories SHARE the same DbContext = same transaction
-    public IUserRepository         Users
-        => _users         ??= new UserRepository(_context);
+    public IUserRepository Users
+        => _users ??= new UserRepository(_context);
 
-    public IEmployeeRepository     Employees
-        => _employees     ??= new EmployeeRepository(_context);
+    public IEmployeeRepository Employees
+        => _employees ??= new EmployeeRepository(_context);
 
-    public IDepartmentRepository   Departments
-        => _departments   ??= new DepartmentRepository(_context);
+    public IDepartmentRepository Departments
+        => _departments ??= new DepartmentRepository(_context);
 
     public ILeaveRequestRepository LeaveRequests
         => _leaveRequests ??= new LeaveRequestRepository(_context);
+
+    public ILeaveTypeRepository LeaveTypes      // ← Add this
+        => _leaveTypes ??= new LeaveTypeRepository(_context);
 
     public async Task<int> SaveChangesAsync()
         => await _context.SaveChangesAsync();

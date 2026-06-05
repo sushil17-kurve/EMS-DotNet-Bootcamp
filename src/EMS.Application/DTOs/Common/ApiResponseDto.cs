@@ -16,9 +16,17 @@ public class ApiResponseDto<T>
         };
 
     public static ApiResponseDto<T> Fail(string error)
+    => new()
+    {
+        Success = false,
+        Errors = new List<string> { error }
+    };
+
+    public static ApiResponseDto<T> Fail(string message, List<string> errors)
         => new()
         {
             Success = false,
-            Errors = new List<string> { error }
+            Message = message,
+            Errors = errors
         };
 }

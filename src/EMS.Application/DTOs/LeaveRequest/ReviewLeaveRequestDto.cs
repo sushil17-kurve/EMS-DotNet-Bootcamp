@@ -4,4 +4,5 @@ public class ReviewLeaveRequestDto
 {
     public string Status { get; set; } = string.Empty;
     public string? ReviewNote { get; set; }
+    public string Action { get; set; } = string.Empty;
 }
