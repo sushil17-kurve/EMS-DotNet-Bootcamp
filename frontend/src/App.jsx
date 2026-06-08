@@ -7,9 +7,9 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
-
+import EmployeesPage from './pages/employees/EmployeesPage';
 // Placeholder pages — built Day 10+
-const EmployeesPage = () => <div style={{ padding: 32 }}><h2>Employees — Coming Day 10</h2></div>;
+//const EmployeesPage = () => <div style={{ padding: 32 }}><h2>Employees — Coming Day 10</h2></div>;
 const DepartmentsPage = () => <div style={{ padding: 32 }}><h2>Departments — Coming Day 10</h2></div>;
 const LeavesPage = () => <div style={{ padding: 32 }}><h2>Leaves — Coming Day 11</h2></div>;
 
