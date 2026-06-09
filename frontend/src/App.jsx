@@ -8,10 +8,8 @@ import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
-// Placeholder pages — built Day 10+
-//const EmployeesPage = () => <div style={{ padding: 32 }}><h2>Employees — Coming Day 10</h2></div>;
-const DepartmentsPage = () => <div style={{ padding: 32 }}><h2>Departments — Coming Day 10</h2></div>;
-const LeavesPage = () => <div style={{ padding: 32 }}><h2>Leaves — Coming Day 11</h2></div>;
+import DepartmentsPage from './pages/departments/DepartmentsPage';
+import LeavesPage from './pages/leaves/LeavesPage';
 
 function App() {
     return (
@@ -21,10 +19,7 @@ function App() {
             <BrowserRouter>
                 <AuthProvider>
                     <Routes>
-                        {/* Public */}
                         <Route path="/login" element={<LoginPage />} />
-
-                        {/* Protected — all inside MainLayout */}
                         <Route element={
                             <ProtectedRoute>
                                 <MainLayout />
@@ -35,8 +30,6 @@ function App() {
                             <Route path="/departments" element={<DepartmentsPage />} />
                             <Route path="/leaves" element={<LeavesPage />} />
                         </Route>
-
-                        {/* Redirects */}
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
