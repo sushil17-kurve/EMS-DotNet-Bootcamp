@@ -9,112 +9,144 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+// ── Bootstrap logger (captures startup errors) ────────────────────────────
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-// ── Controllers with FluentValidation ─────────────────────────────────────
-builder.Services.AddControllers()
-    .ConfigureApiBehaviorOptions(options =>
-    {
-        options.InvalidModelStateResponseFactory = context =>
-        {
-            var errors = context.ModelState
-                .Where(e => e.Value?.Errors.Count > 0)
-                .SelectMany(e => e.Value!.Errors.Select(x => x.ErrorMessage))
-                .ToList();
+Log.Information("🚀 EMS API starting up...");
 
-            var response = ApiResponseDto<object>.Fail(
-                "Validation failed.",
-                errors);
-
-            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(response);
-        };
-    });
-
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddValidatorsFromAssemblyContaining<RegisterValidator>();
-
-builder.Services.AddEndpointsApiExplorer();
-
-// ── Swagger with JWT ───────────────────────────────────────────────────────
-builder.Services.AddSwaggerGen(c =>
+try
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "EMS API",
-        Version = "v1"
-    });
+    var builder = WebApplication.CreateBuilder(args);
 
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Enter JWT Token"
-    });
+    // ── Serilog ───────────────────────────────────────────────────────────
+    builder.Host.UseSerilog((context, services, configuration) =>
+        configuration.ReadFrom.Configuration(context.Configuration)
+                     .ReadFrom.Services(services)
+                     .Enrich.FromLogContext());
 
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+    // ── Controllers + Validation ──────────────────────────────────────────
+    builder.Services.AddControllers()
+        .ConfigureApiBehaviorOptions(options =>
         {
-            new OpenApiSecurityScheme
+            options.InvalidModelStateResponseFactory = context =>
             {
-                Reference = new OpenApiReference
+                var errors = context.ModelState
+                    .Where(e => e.Value?.Errors.Count > 0)
+                    .SelectMany(e => e.Value!.Errors
+                        .Select(x => x.ErrorMessage))
+                    .ToList();
+
+                var response = ApiResponseDto<object>.Fail(
+                    "Validation failed.", errors);
+
+                return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(response);
+            };
+        });
+
+    builder.Services.AddFluentValidationAutoValidation();
+    builder.Services.AddValidatorsFromAssemblyContaining<RegisterValidator>();
+
+    builder.Services.AddEndpointsApiExplorer();
+
+    // ── Swagger with JWT ──────────────────────────────────────────────────
+    builder.Services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new OpenApiInfo
+        {
+            Title = "EMS API",
+            Version = "v1",
+            Description = "Employee Management System API"
+        });
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization. Enter: Bearer {token}",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
+            Scheme = "Bearer"
+        });
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+                    Reference = new OpenApiReference
+                        { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                },
+                Array.Empty<string>()
+            }
+        });
     });
-});
 
-// Application + Infrastructure
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+    // ── Application & Infrastructure layers ───────────────────────────────
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── CORS ───────────────────────────────────────────────────────────────────
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowReactApp", policy =>
-        policy.WithOrigins("http://localhost:3000")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials());
-});
+    // ── CORS ──────────────────────────────────────────────────────────────
+    builder.Services.AddCors(options =>
+        options.AddPolicy("AllowReactApp", policy =>
+            policy.WithOrigins(
+                      "http://localhost:5173",
+                      "http://localhost:3000")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials()));
 
-var app = builder.Build();
+    var app = builder.Build();
 
-// ── Global Exception Middleware ────────────────────────────────────────────
-app.UseMiddleware<ExceptionMiddleware>();
+    // ── Exception middleware FIRST ─────────────────────────────────────────
+    app.UseMiddleware<ExceptionMiddleware>();
 
-// Auto migrate + seed
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    // ── Serilog request logging ────────────────────────────────────────────
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.MessageTemplate =
+            "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
+    });
 
-    await db.Database.MigrateAsync();
-    await DatabaseSeeder.SeedAsync(db);
+    // ── DB migration + seed ────────────────────────────────────────────────
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+
+        Log.Information("Applying database migrations...");
+        await db.Database.MigrateAsync();
+
+        Log.Information("Seeding database...");
+        await DatabaseSeeder.SeedAsync(db);
+    }
+
+    // ── Swagger (dev only) ─────────────────────────────────────────────────
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "EMS API v1");
+            c.RoutePrefix = "swagger";
+        });
+    }
+
+    app.UseStaticFiles();
+    app.UseCors("AllowReactApp");
+    app.UseHttpsRedirection();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+
+    Log.Information("✅ EMS API started successfully");
+    app.Run();
 }
-
-if (app.Environment.IsDevelopment())
+catch (Exception ex)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    Log.Fatal(ex, "❌ EMS API failed to start");
 }
-
-// Serve uploaded files
-app.UseStaticFiles();
-
-app.UseCors("AllowReactApp");
-
-app.UseHttpsRedirection();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+finally
+{
+    Log.CloseAndFlush();
+}

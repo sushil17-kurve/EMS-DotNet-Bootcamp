@@ -1,7 +1,6 @@
-﻿using EMS.Application.DTOs.Common;
-using System.Diagnostics;
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
+using EMS.Application.DTOs.Common;
 
 namespace EMS.API.Middleware;
 
@@ -25,14 +24,16 @@ public class ExceptionMiddleware
     {
         try
         {
-            await _next(context); // Run the next middleware/controller
+            await _next(context);
         }
         catch (Exception ex)
         {
+            // Structured logging — searchable in log files
             _logger.LogError(ex,
-                "Unhandled exception for {Method} {Path}",
+                "Unhandled exception. Method: {Method} Path: {Path} User: {User}",
                 context.Request.Method,
-                context.Request.Path);
+                context.Request.Path,
+                context.User?.Identity?.Name ?? "Anonymous");
 
             await HandleExceptionAsync(context, ex);
         }
@@ -44,7 +45,6 @@ public class ExceptionMiddleware
 
         var (statusCode, message) = ex switch
         {
-            // Add custom exception types here as you build more features
             UnauthorizedAccessException => (
                 HttpStatusCode.Unauthorized,
                 "You are not authorized to perform this action."),
@@ -57,26 +57,30 @@ public class ExceptionMiddleware
                 HttpStatusCode.BadRequest,
                 ex.Message),
 
-            // Default: internal server error
-            _ => (HttpStatusCode.InternalServerError,
-                  "An unexpected error occurred. Please try again later.")
+            InvalidOperationException => (
+                HttpStatusCode.BadRequest,
+                ex.Message),
+
+            _ => (
+                HttpStatusCode.InternalServerError,
+                "An unexpected error occurred. Please try again later.")
         };
 
         context.Response.StatusCode = (int)statusCode;
 
-        // In development, include the full stack trace for debugging
-        // In production, NEVER expose internal details
+        // In development: expose details for debugging
+        // In production: only safe message
         var response = _env.IsDevelopment()
-    ? ApiResponseDto<object>.Fail(
-        message,
-        new List<string> { ex.Message, ex.StackTrace ?? "" })
-    : ApiResponseDto<object>.Fail(
-        message,
-        new List<string>());
+            ? ApiResponseDto<object>.Fail(message,
+                new List<string> { ex.Message, ex.StackTrace ?? "" })
+            : ApiResponseDto<object>.Fail(message);
 
-        var json = JsonSerializer.Serialize(response,
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
 
-        await context.Response.WriteAsync(json);
+        await context.Response.WriteAsync(
+            JsonSerializer.Serialize(response, options));
     }
 }

@@ -20,6 +20,11 @@ Thumbs.db
 *.log
 logs/
 
+# Logs
+logs/
+*.log
+src/EMS.API/logs/
+
 # Uploaded files (don't commit user uploads)
 src/EMS.API/wwwroot/uploads/profiles/*.jpg
 src/EMS.API/wwwroot/uploads/profiles/*.jpeg
